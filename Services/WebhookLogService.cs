@@ -19,10 +19,7 @@ public class WebhookLogService
     {
         _entries.Enqueue(entry);
 
-        while (_entries.Count > MaxEntries && _entries.TryDequeue(out _))
-        {
-            // Descarta los más antiguos
-        }
+        while (_entries.Count > MaxEntries && _entries.TryDequeue(out _)) { }
     }
 
     public IReadOnlyCollection<WebhookLogEntry> GetAll()
@@ -30,5 +27,10 @@ public class WebhookLogService
         return _entries.ToArray()
             .OrderByDescending(e => e.ReceivedAt)
             .ToArray();
+    }
+
+    public void Clear()
+    {
+        while (_entries.TryDequeue(out _)) { }
     }
 }

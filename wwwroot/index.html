@@ -64,12 +64,15 @@
         .header {
             display: flex;
             flex-wrap: wrap;
-            align-items: baseline;
-            gap: 0.5rem;
+            align-items: center;
+            gap: 0.75rem;
             justify-content: space-between;
         }
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
         button {
-            background: #2563eb;
             border: none;
             color: white;
             padding: 0.35rem 0.75rem;
@@ -77,8 +80,17 @@
             cursor: pointer;
             font-size: 0.85rem;
         }
-        button:hover {
+        button.refresh {
+            background: #2563eb;
+        }
+        button.refresh:hover {
             background: #1d4ed8;
+        }
+        button.clear {
+            background: #b91c1c;
+        }
+        button.clear:hover {
+            background: #991b1b;
         }
         .small {
             font-size: 0.75rem;
@@ -90,10 +102,13 @@
     <div class="header">
         <div>
             <h1>Monitor Webhook DIDI</h1>
-            <div class="small">Muestra las últimas notificaciones recibidas en <code>/webhook-didi</code>.</div>
+            <div class="small">
+                Últimas notificaciones recibidas en <code>/webhook-didi</code>
+            </div>
         </div>
-        <div>
-            <button onclick="fetchLogs(true)">Refrescar ahora</button>
+        <div class="actions">
+            <button class="refresh" onclick="fetchLogs(true)">Refrescar</button>
+            <button class="clear" onclick="clearLogs()">Eliminar logs</button>
         </div>
     </div>
 
@@ -114,11 +129,7 @@
     <script>
         function safeParseDate(value) {
             if (!value) return null;
-
-            // Si ya es ISO válido, se convierte directo
             const d = new Date(value);
-
-            // Validación robusta
             return isNaN(d.getTime()) ? null : d;
         }
 
@@ -140,12 +151,12 @@
                 body.innerHTML = '';
 
                 if (!Array.isArray(data) || data.length === 0) {
-                    body.innerHTML = '<tr><td colspan="4" class="small">Sin registros aún. Envía un POST a <code>/webhook-didi</code> para empezar a ver datos.</td></tr>';
+                    body.innerHTML =
+                        '<tr><td colspan="4" class="small">No hay registros.</td></tr>';
                 } else {
                     for (const entry of data) {
                         const tr = document.createElement('tr');
 
-                        // Fecha segura
                         const parsedDate = safeParseDate(entry.receivedAt);
                         const formattedDate = parsedDate
                             ? parsedDate.toISOString().replace('T', ' ').substring(0, 19)
@@ -155,9 +166,8 @@
                         tdDate.textContent = formattedDate;
                         tr.appendChild(tdDate);
 
-                        // Movimiento
                         const tdMov = document.createElement('td');
-                        const mov = entry.parsed?.movementType || "-";
+                        const mov = entry.parsed?.movementType || '-';
 
                         const pill = document.createElement('span');
                         pill.className = 'pill ' + (mov === 'C' ? 'pill-ok' : 'pill-error');
@@ -171,13 +181,14 @@
 
                         tr.appendChild(tdMov);
 
-                        // Monto
                         const tdAmount = document.createElement('td');
-                        tdAmount.innerHTML = (entry.parsed?.amount ?? '-') +
-                            '<br/><span class="small">' + (entry.parsed?.currency ?? '') + '</span>';
+                        tdAmount.innerHTML =
+                            (entry.parsed?.amount ?? '-') +
+                            '<br/><span class="small">' +
+                            (entry.parsed?.currency ?? '') +
+                            '</span>';
                         tr.appendChild(tdAmount);
 
-                        // JSON
                         const tdJson = document.createElement('td');
                         const pre = document.createElement('pre');
                         pre.textContent = entry.rawBody || '';
@@ -188,10 +199,31 @@
                     }
                 }
 
-                status.textContent = 'Última actualización: ' + new Date().toLocaleTimeString();
+                status.textContent =
+                    'Última actualización: ' + new Date().toLocaleTimeString();
             } catch (err) {
                 console.error(err);
                 status.textContent = 'Error cargando logs: ' + err.message;
+            }
+        }
+
+        async function clearLogs() {
+            if (!confirm('¿Seguro que querés eliminar todos los logs?')) {
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/logs', { method: 'DELETE' });
+                if (!res.ok) {
+                    throw new Error('HTTP ' + res.status);
+                }
+
+                document.getElementById('status').textContent =
+                    'Logs eliminados correctamente.';
+                fetchLogs(false);
+            } catch (err) {
+                console.error(err);
+                alert('Error eliminando logs: ' + err.message);
             }
         }
 

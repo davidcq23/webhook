@@ -20,7 +20,7 @@
             font-size: 0.9rem;
         }
         table {
-            width: 100%%;
+            width: 100%;
             border-collapse: collapse;
             margin-top: 1rem;
             background: #020617;
@@ -96,7 +96,9 @@
             <button onclick="fetchLogs(true)">Refrescar ahora</button>
         </div>
     </div>
+
     <div id="status" class="small">Cargando logs...</div>
+
     <table>
         <thead>
             <tr>
@@ -106,22 +108,34 @@
                 <th>JSON completo</th>
             </tr>
         </thead>
-        <tbody id="logs-body">
-        </tbody>
+        <tbody id="logs-body"></tbody>
     </table>
 
     <script>
+        function safeParseDate(value) {
+            if (!value) return null;
+
+            // Si ya es ISO válido, se convierte directo
+            const d = new Date(value);
+
+            // Validación robusta
+            return isNaN(d.getTime()) ? null : d;
+        }
+
         async function fetchLogs(manual) {
             const status = document.getElementById('status');
             const body = document.getElementById('logs-body');
+
             try {
                 if (manual) {
                     status.textContent = 'Actualizando...';
                 }
+
                 const res = await fetch('/api/logs');
                 if (!res.ok) {
-                    throw new Error('Error HTTP ' + res.status);
+                    throw new Error('HTTP ' + res.status);
                 }
+
                 const data = await res.json();
                 body.innerHTML = '';
 
@@ -131,28 +145,39 @@
                     for (const entry of data) {
                         const tr = document.createElement('tr');
 
-                        const receivedAt = new Date(entry.receivedAt + 'Z'); // forzamos UTC
-                        const parsed = entry.parsed || {};
+                        // Fecha segura
+                        const parsedDate = safeParseDate(entry.receivedAt);
+                        const formattedDate = parsedDate
+                            ? parsedDate.toISOString().replace('T', ' ').substring(0, 19)
+                            : 'N/A';
 
                         const tdDate = document.createElement('td');
-                        tdDate.textContent = receivedAt.toISOString().replace('T', ' ').substring(0, 19);
+                        tdDate.textContent = formattedDate;
                         tr.appendChild(tdDate);
 
+                        // Movimiento
                         const tdMov = document.createElement('td');
+                        const mov = entry.parsed?.movementType || "-";
+
                         const pill = document.createElement('span');
-                        pill.className = 'pill ' + (parsed.movementType === 'C' ? 'pill-ok' : 'pill-error');
-                        pill.textContent = parsed.movementType || '-';
+                        pill.className = 'pill ' + (mov === 'C' ? 'pill-ok' : 'pill-error');
+                        pill.textContent = mov;
                         tdMov.appendChild(pill);
+
                         const divId = document.createElement('div');
                         divId.className = 'small';
-                        divId.textContent = parsed.idTransaction || '';
+                        divId.textContent = entry.parsed?.idTransaction || '';
                         tdMov.appendChild(divId);
+
                         tr.appendChild(tdMov);
 
+                        // Monto
                         const tdAmount = document.createElement('td');
-                        tdAmount.innerHTML = (parsed.amount ?? '-') + '<br/><span class="small">' + (parsed.currency || '') + '</span>';
+                        tdAmount.innerHTML = (entry.parsed?.amount ?? '-') +
+                            '<br/><span class="small">' + (entry.parsed?.currency ?? '') + '</span>';
                         tr.appendChild(tdAmount);
 
+                        // JSON
                         const tdJson = document.createElement('td');
                         const pre = document.createElement('pre');
                         pre.textContent = entry.rawBody || '';
@@ -162,6 +187,7 @@
                         body.appendChild(tr);
                     }
                 }
+
                 status.textContent = 'Última actualización: ' + new Date().toLocaleTimeString();
             } catch (err) {
                 console.error(err);
@@ -169,7 +195,6 @@
             }
         }
 
-        // Auto refresh cada 5 segundos
         setInterval(fetchLogs, 5000);
         fetchLogs(false);
     </script>

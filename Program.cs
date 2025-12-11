@@ -33,6 +33,12 @@ app.MapGet("/api/logs", (WebhookLogService logService) =>
     return Results.Ok(logs);
 });
 
+//limpia todo los logs de la cache
+app.MapDelete("/api/logs", (WebhookLogService logService) =>
+{
+    logService.Clear();
+    return Results.Ok(new { status = "logs cleared" });
+});
 // Endpoint del webhook DIDI
 app.MapPost("/webhook-didi", async (HttpContext context, WebhookLogService logService, ILoggerFactory loggerFactory, IConfiguration configuration) =>
 {
